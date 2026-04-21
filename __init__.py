@@ -680,7 +680,7 @@ footer a{color:var(--blue);text-decoration:none}
     bundle <span id="p-date">...</span>
   </div>
   <div>
-    <a href="/api/prices" target="_blank" style="color:#00ff88;margin-right:14px">View table</a>
+    <a href="/prices" target="_blank" style="color:#00ff88;margin-right:14px">View table</a>
     <a href="/help" style="color:#00ff88">Help &amp; override docs</a>
   </div>
 </div>
@@ -819,6 +819,139 @@ setInterval(tick, 2000);
 """.replace("__VERSION__", __version__)
 
 
+def _prices_page_html() -> str:
+    """Human-readable pricing table + instructions for overriding rates."""
+    import html as _h
+    info = _prices_info()
+    rows = []
+    for model, (tin, tout) in info["prices"].items():
+        free = (tin == 0.0 and tout == 0.0)
+        in_cell = "free" if free else f"${tin:.2f}"
+        out_cell = "free" if free else f"${tout:.2f}"
+        cls = ' class="free"' if free else ""
+        rows.append(
+            f"<tr{cls}><td><code>{_h.escape(model)}</code></td>"
+            f"<td class=\"num\">{in_cell}</td>"
+            f"<td class=\"num\">{out_cell}</td></tr>"
+        )
+    table_html = "\n".join(rows)
+    source = info["source"]
+    override_active = info["override_active"]
+    source_html = (
+        f'<code>{_h.escape(source)}</code>' if override_active
+        else '<code>built-in defaults</code> '
+             '<span class="muted">(no AGENTSPEND_PRICING set)</span>'
+    )
+    age = info["bundle_age_days"]
+    age_html = "" if age is None else f" &middot; bundle is <strong>{age} days</strong> old"
+    stale_banner = ""
+    if not override_active and age is not None and age > 30:
+        stale_banner = (
+            '<div class="stale">'
+            f'<strong>Pricing table is {age} days old.</strong> '
+            'Vendor rates change 2-4 times a year. '
+            'Override with your own rates using the steps below.'
+            '</div>'
+        )
+    local_runtimes = ", ".join(info["local_runtimes"]) or "<span class=\"muted\">none</span>"
+    return f"""<!doctype html>
+<html><head>
+<meta charset="utf-8"><title>AGENTSPEND - Model pricing</title>
+<style>
+:root{{--bg:#0b0d10;--panel:#11151a;--line:#1d232b;--text:#e6edf3;--dim:#8b949e;
+      --accent:#f0883e;--green:#3fb950;--mono:'SF Mono',Consolas,Monaco,monospace}}
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:0 0 40px}}
+header{{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--panel)}}
+.brand{{font-family:var(--mono);font-weight:700;letter-spacing:1px;color:var(--accent)}}
+.brand span{{color:var(--dim);font-weight:400;margin-left:8px}}
+main{{max-width:980px;margin:24px auto;padding:0 22px}}
+h1{{font-size:1.4rem;margin-bottom:4px}}
+h2{{font-size:1.05rem;margin:28px 0 10px;color:var(--accent)}}
+.meta{{color:var(--dim);font-size:.85rem;margin-bottom:18px}}
+.panel{{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px;margin-bottom:16px}}
+table{{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.88rem}}
+th{{text-align:left;padding:8px 12px;color:var(--dim);text-transform:uppercase;font-size:.65rem;letter-spacing:1px;border-bottom:1px solid var(--line)}}
+td{{padding:8px 12px;border-bottom:1px solid var(--line)}}
+td.num{{text-align:right;color:var(--accent);font-weight:600}}
+tr.free td.num{{color:var(--green)}}
+code{{background:#0a0a0a;padding:2px 6px;border-radius:3px;color:var(--green);font-family:var(--mono);font-size:.82rem}}
+pre{{background:#070709;border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:.82rem;color:var(--text);line-height:1.55}}
+ol{{padding-left:22px;line-height:1.8}}
+ol li{{margin-bottom:6px}}
+.stale{{background:rgba(255,200,0,.08);border:1px solid rgba(255,200,0,.3);border-left:3px solid #ffc800;color:var(--text);padding:12px 16px;border-radius:6px;margin-bottom:16px;font-size:.88rem}}
+.muted{{color:var(--dim)}}
+.nav a{{color:var(--green);margin-right:16px;text-decoration:none}}
+.nav a:hover{{text-decoration:underline}}
+.legend{{color:var(--dim);font-size:.8rem;margin-top:8px}}
+</style>
+</head><body>
+<header>
+  <div class="brand">AGENTSPEND <span>for HookBus&trade;</span></div>
+  <div class="nav"><a href="/">&larr; Dashboard</a><a href="/help">Help</a><a href="/api/prices" target="_blank">Raw JSON</a></div>
+</header>
+<main>
+  <h1>Model pricing</h1>
+  <div class="meta">USD per 1 million tokens &middot; bundle date <strong>{info["bundle_date"]}</strong>{age_html}</div>
+  {stale_banner}
+
+  <div class="panel">
+    <strong>Active source:</strong> {source_html}<br>
+    <strong>Models loaded:</strong> {info["model_count"]}<br>
+    <strong>Local runtimes (zero-cost):</strong> {local_runtimes}
+  </div>
+
+  <table>
+    <thead><tr><th>Model</th><th class="num">Input / 1M tok</th><th class="num">Output / 1M tok</th></tr></thead>
+    <tbody>
+{table_html}
+    </tbody>
+  </table>
+  <div class="legend">Rows marked <strong style="color:var(--green)">free</strong> are promotional or local-runtime models billed at zero.</div>
+
+  <h2>How to update the prices file</h2>
+  <div class="panel">
+    <p>AGENTSPEND loads its price table at start-up. You override the built-in defaults by pointing <code>AGENTSPEND_PRICING</code> at a JSON file. Restart the service to pick up changes.</p>
+
+    <ol>
+      <li><strong>Create a JSON file</strong> (any path the container/host can read) with one entry per model. Keys are lowercase model IDs, values are <code>[input_usd_per_1m, output_usd_per_1m]</code>:
+<pre>{{
+  "claude-opus-4-7":   [15.00, 75.00],
+  "claude-sonnet-4-6": [ 3.00, 15.00],
+  "gpt-5-4":           [ 5.00, 15.00],
+  "gemini-3-pro":      [ 1.25,  5.00],
+  "glm-5":             [ 0.50,  1.50],
+  "minimax-m2-7":      [ 0.30,  1.20]
+}}</pre>
+      </li>
+      <li><strong>Set the environment variable</strong> to the file path, then restart the service:
+<pre># docker compose (recommended)
+services:
+  agentspend:
+    environment:
+      AGENTSPEND_PRICING: /etc/agentspend/prices.json
+    volumes:
+      - ./prices.json:/etc/agentspend/prices.json:ro
+
+# systemd unit
+Environment=AGENTSPEND_PRICING=/etc/agentspend/prices.json
+
+# bare process
+AGENTSPEND_PRICING=/etc/agentspend/prices.json python -m agentspend</pre>
+      </li>
+      <li><strong>Restart</strong> and reload this page. Active source should switch from <code>built-in defaults</code> to your file path.</li>
+    </ol>
+
+    <p class="muted" style="margin-top:12px">Notes: malformed JSON falls back to defaults and logs a warning to stderr. Model IDs are normalised lowercase with <code>.</code>, <code>_</code>, <code>/</code> replaced by <code>-</code>. Pricing changes do not hot-reload &mdash; the service must restart.</p>
+  </div>
+
+  <h2>Raw data</h2>
+  <div class="panel"><p>The machine-readable version of this table is at <a href="/api/prices" style="color:var(--green)"><code>/api/prices</code></a>. The dashboard polls it every 2s for staleness checks.</p></div>
+</main>
+</body></html>
+"""
+
+
 class _Handler(BaseHTTPRequestHandler):
     def _send_json(self, obj, status=200):
         body = json.dumps(obj).encode()
@@ -882,6 +1015,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "version": __version__})
         elif path == "/api/prices":
             self._send_json(_prices_info())
+        elif path == "/prices":
+            self._send_html(_prices_page_html())
         elif path == "/help":
             self._send_help()
         else:
