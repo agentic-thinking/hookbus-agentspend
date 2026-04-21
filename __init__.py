@@ -28,7 +28,7 @@ from threading import Lock
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 DB_PATH = Path(os.environ.get("AGENTSPEND_DB", str(Path.home() / ".agentspend" / "events.db")))
 RETENTION_DAYS = int(os.environ.get("AGENTSPEND_RETENTION_DAYS", "90"))
