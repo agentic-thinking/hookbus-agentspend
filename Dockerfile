@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 LABEL com.agentic-thinking.product="HookBus-AgentSpend"
 LABEL com.agentic-thinking.tier="community"
 LABEL org.opencontainers.image.title="HookBus-AgentSpend"
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="0.2.2"
 LABEL org.opencontainers.image.vendor="Agentic Thinking Limited"
 LABEL org.opencontainers.image.documentation="https://github.com/agentic-thinking/hookbus-agentspend"
 
